@@ -1,0 +1,138 @@
+<?php
+
+/*
+ *  *** CONFIG ***
+ */ 
+
+/**
+ * Implementation of hook_menu().
+ */
+function taxonomy_classes_menu(){
+
+  $items = array();
+
+  $items['admin/config/taxonomy_classes'] = array(
+      'title' => 'Taxonomy Classes',
+      'description' => 'Configuration for Taxonomy Classes module',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('taxonomy_classes_admin_form'),
+      'access arguments' => array('administer themes'),
+      'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/taxonomy_classes/settings'] = array(
+      'title' => 'taxonomy nav settings',
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+
+
+  return $items;
+
+}
+
+function taxonomy_classes_admin_form($form, &$form_state) {
+
+  $vocabs = taxonomy_get_vocabularies();
+
+  foreach($vocabs as $vocab){
+    $options[$vocab->machine_name] = $vocab->name;
+  }
+
+  $form['taxonomy_classes_vocabs'] = array(
+    '#type' => 'select',
+    '#title' => t('Vocabularies'),
+    '#description' => 'Terms from the selected vocabularies will be added as classes to the body in the form <em>vocabularyname-termname</em>',
+    '#default_value' => variable_get('taxonomy_classes_vocabs',array()),
+    '#options' => $options,
+    '#multiple' => true,
+  );
+
+  if(module_exists('entityreference')){
+
+    $fields = db_query("SELECT DISTINCT fi.field_name FROM {field_config_instance} fi LEFT JOIN {field_config} fc ON fi.field_id = fc.id WHERE fc.type = 'entityreference' AND fi.entity_type = 'node'")->fetchAllAssoc('field_name');
+
+    foreach($fields as $key => $field){
+      $fields[$key] = $key;
+    }
+
+    $form['taxonomy_classes_reference_fields'] = array(
+      '#type' => 'select',
+      '#multiple' => true,
+      '#title' => 'Use referenced nodes',
+      '#options' => $fields,
+      '#description' => 'If you select any fields here, referenced nodes will also be checked for terms if present.',
+      '#default_value'=>variable_get('taxonomy_classes_reference_fields',array()),
+      );
+
+  }
+
+  return system_settings_form($form);
+
+}
+
+/*
+ *  *** DO THE STUFF ***
+ */ 
+
+
+
+function taxonomy_classes_preprocess_html(&$vars){
+
+  if(arg(0) == 'taxonomy' && arg(1) == 'term'){
+    $term = taxonomy_term_load(arg(2));
+    if(taxonomy_classes_use_term($term)){
+      $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
+      $vars['classes_array'][] = $class;
+    }
+  }
+
+  if(arg(0) == 'node' && is_numeric(arg(1))){
+
+    $terms = taxonomy_classes_get_terms_from_nid(arg(1));
+    foreach($terms as $term){
+      $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
+      $vars['classes_array'][$class] = $class;
+    }
+
+  }
+
+}
+
+function taxonomy_classes_get_terms_from_nid($nid){
+
+  $terms = array();
+  $nids = array($nid);
+  $reference_fields = variable_get('taxonomy_classes_reference_fields',array());
+
+  if(!empty($reference_fields)){
+    foreach($reference_fields as $field){
+      $val = $field . '_target_id';
+      $table = 'field_data_' . $field;
+      $reference_nid = db_query("SELECT " . $val . " FROM {" . $table . "} WHERE entity_id = ?",array(arg(1)))->fetchField();
+      if($reference_nid) $nids[] = $reference_nid;
+    }
+  }
+
+  foreach ($nids as $nid){
+
+    $tids = db_query("SELECT tid FROM {taxonomy_index} WHERE nid = ?",array($nid))->fetchAllAssoc('tid');
+    $tids = array_keys($tids);
+    foreach($tids as $tid){
+      $term = taxonomy_term_load($tid);
+      if(taxonomy_classes_use_term($term)){
+        $terms[] = $term;
+      }
+    }
+  }
+
+  return $terms;
+
+}
+
+// do we use this term? returns true or false
+function taxonomy_classes_use_term($term){
+  $term = is_numeric($term) ? taxonomy_term_load($term) : $term;
+  $vocabs = variable_get('taxonomy_classes_vocabs',array());
+  if(in_array($term->vocabulary_machine_name,$vocabs)) return true;
+  return false;
+}

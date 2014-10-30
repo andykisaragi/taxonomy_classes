@@ -1,0 +1,8 @@
+name = Taxonomy Classes
+description = Add body classes based on presence of taxonomy terms
+core = 7.x
+package = Positive
+version = 1.0
+dependencies[] = taxonomy
+
+configure = admin/config/taxonomy_classes
