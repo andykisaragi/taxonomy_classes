@@ -82,7 +82,7 @@ function taxonomy_classes_preprocess_html(&$vars){
     $term = taxonomy_term_load(arg(2));
     if(taxonomy_classes_use_term($term)){
       $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
-      $class = str_replace(array(" ","_"),"-",$class);
+      $class = drupal_clean_css_identifier($class);
       $vars['classes_array'][] = $class;
     }
   }
@@ -92,7 +92,7 @@ function taxonomy_classes_preprocess_html(&$vars){
     $terms = taxonomy_classes_get_terms_from_nid(arg(1));
     foreach($terms as $term){
       $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
-      $class = str_replace(array(" ","_"),"-",$class);
+      $class = drupal_clean_css_identifier($class);
       $vars['classes_array'][$class] = $class;
     }
 
