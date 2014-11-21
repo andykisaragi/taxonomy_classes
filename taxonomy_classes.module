@@ -81,7 +81,8 @@ function taxonomy_classes_preprocess_html(&$vars){
   if(arg(0) == 'taxonomy' && arg(1) == 'term'){
     $term = taxonomy_term_load(arg(2));
     if(taxonomy_classes_use_term($term)){
-      $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
+      $termname = str_replace(" ","-",$term->name);
+      $class = strtolower($term->vocabulary_machine_name . "-" . $termname);
       $vars['classes_array'][] = $class;
     }
   }
@@ -90,7 +91,8 @@ function taxonomy_classes_preprocess_html(&$vars){
 
     $terms = taxonomy_classes_get_terms_from_nid(arg(1));
     foreach($terms as $term){
-      $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
+      $termname = str_replace(" ","-",$term->name);
+      $class = strtolower($term->vocabulary_machine_name . "-" . $termname);
       $vars['classes_array'][$class] = $class;
     }
 
