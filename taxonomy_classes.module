@@ -131,8 +131,6 @@ function taxonomy_classes_get_node_classes($node){
 
   $nid = is_object($node) ? $node->nid : $node;
 
-  drupal_set_message('taxonomy_classes_get_node_classes ' . $nid);
-
   if(is_numeric($nid)){
 
     $classes = array();
