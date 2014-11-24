@@ -89,12 +89,8 @@ function taxonomy_classes_preprocess_html(&$vars){
 
   if(arg(0) == 'node' && is_numeric(arg(1))){
 
-    $terms = taxonomy_classes_get_terms_from_nid(arg(1));
-    foreach($terms as $term){
-      $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
-      $class = drupal_clean_css_identifier($class);
-      $vars['classes_array'][$class] = $class;
-    }
+    $classes = taxonomy_classes_get_node_classes(arg(1));
+    $vars['classes_array'] = array_merge($vars['classes_array'],$classes);
 
   }
 
@@ -128,6 +124,31 @@ function taxonomy_classes_get_terms_from_nid($nid){
   }
 
   return $terms;
+
+}
+
+function taxonomy_classes_get_node_classes($node){
+
+  $nid = is_object($node) ? $node->nid : $node;
+
+  drupal_set_message('taxonomy_classes_get_node_classes ' . $nid);
+
+  if(is_numeric($nid)){
+
+    $classes = array();
+
+    $terms = taxonomy_classes_get_terms_from_nid($nid);
+    foreach($terms as $term){
+      $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
+      $class = drupal_clean_css_identifier($class);
+      $classes[$class] = $class;
+    }
+
+
+
+    return $classes;
+
+  }
 
 }
 
