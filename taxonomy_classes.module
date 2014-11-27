@@ -12,18 +12,37 @@ function taxonomy_classes_menu(){
   $items = array();
 
   $items['admin/config/taxonomy_classes'] = array(
-      'title' => 'Taxonomy Classes',
-      'description' => 'Configuration for Taxonomy Classes module',
-      'page callback' => 'drupal_get_form',
-      'page arguments' => array('taxonomy_classes_admin_form'),
-      'access arguments' => array('administer themes'),
-      'type' => MENU_NORMAL_ITEM,
+    'title' => 'Taxonomy Classes',
+    'description' => 'Configuration for Taxonomy Classes module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('taxonomy_classes_admin_form'),
+    'access arguments' => array('administer themes'),
+    'type' => MENU_NORMAL_ITEM,
   );
 
   $items['admin/config/taxonomy_classes/settings'] = array(
-      'title' => 'taxonomy nav settings',
-      'type' => MENU_DEFAULT_LOCAL_TASK,
+    'title' => 'taxonomy nav settings',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
   );
+
+  $items['admin/config/taxonomy_classes/styles'] = array(
+    'title' => 'Dynamic styles',
+    'description' => '',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('taxonomy_classes_styles_form'),
+    'access arguments' => array('administer themes'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+
+  $items['taxonomy-classes/css/%/taxonomy-classes.css'] = array(
+    'title' => 'Taxonomy classes dynamic CSS',
+    'page callback' => 'taxonomy_classes_dynamic_css',
+    'page arguments' => array(2),
+    'access arguments' => array('access content'),
+    //'delivery callback' => drupal_add_http_header('Content-Type', 'text/css; utf-8'),
+  );
+
 
 
   return $items;
@@ -70,6 +89,13 @@ function taxonomy_classes_admin_form($form, &$form_state) {
 
 }
 
+function taxonomy_classes_styles_form($form, &$form_state) {
+
+  return system_settings_form($form);
+
+}
+
+
 /*
  *  *** DO THE STUFF ***
  */ 
@@ -93,6 +119,20 @@ function taxonomy_classes_preprocess_html(&$vars){
     $vars['classes_array'] = array_merge($vars['classes_array'],$classes);
 
   }
+
+
+
+  $active_tid = 304;
+  $link_attributes = array(
+    'type' => 'text/css',
+    'rel' => 'stylesheet',
+    'media' => 'all',
+    'href' => '/taxonomy-classes/css/' . $active_tid . '/taxonomy-classes.css',
+  );
+
+  drupal_add_html_head_link($link_attributes);
+
+
 
 }
 
@@ -128,26 +168,17 @@ function taxonomy_classes_get_terms_from_nid($nid){
 }
 
 function taxonomy_classes_get_node_classes($node){
-
   $nid = is_object($node) ? $node->nid : $node;
-
   if(is_numeric($nid)){
-
     $classes = array();
-
     $terms = taxonomy_classes_get_terms_from_nid($nid);
     foreach($terms as $term){
       $class = strtolower($term->vocabulary_machine_name . "-" . $term->name);
       $class = drupal_clean_css_identifier($class);
       $classes[$class] = $class;
     }
-
-
-
     return $classes;
-
   }
-
 }
 
 // do we use this term? returns true or false
@@ -157,3 +188,118 @@ function taxonomy_classes_use_term($term){
   if(in_array($term->vocabulary_machine_name,$vocabs)) return true;
   return false;
 }
+
+
+
+
+
+/*** dynamic css stuff ***/
+
+
+function taxonomy_classes_dynamic_css($tid){
+
+  //drupal_add_http_header('Content-Type', 'text/css; utf-8');
+  header("Content-Type: text/css");
+  $css = taxonomy_classes_get_dynamic_css($tid);
+  //$css = "hello";
+  print $css;
+  die();
+}
+
+
+
+function taxonomy_classes_get_dynamic_css($tid){
+  //dsm('Create dynamic css colour');
+
+  $vid = variable_get("taxonomy_classes_vocab", null);
+  $css = "";
+  //$colours = taxonomy_classes_default_colours();
+
+  // Add the 'All' colour styles, in an array as per $color above;
+  $allColour = variable_get("taxonomy_classes_colour_all", '#633494');
+  $allColourBackground = taxonomy_classes_hex_to_rgb($allColour);
+
+  // @todo - IMO some of these styles should not be in here
+  // eg boder-left: 10px repeated multiple times - should be once
+  // in theme css. only colour should be set in here, ideally only
+  // on generic selectors. andy x
+
+  // Add all the other term colour styles
+  $css .= "
+      .highlight-colour {
+        color: $allColour;
+      }
+      .highlight-border {
+        border-color: $allColour;
+      }
+      ";
+
+  if($vid){
+    $tree = taxonomy_get_tree($vid);
+    foreach ($tree as $count => $term){
+      $meta = taxonomy_classes_get_term_meta($term->tid);
+
+      //dsm($meta);
+
+      //$colour = $meta;
+      $colour = !empty($meta['colour']) ? $meta['colour'] : "";
+      $background_colour = taxonomy_classes_hex_to_rgb($colour);
+
+      $css .= "
+      .highlight-colour: color: $colour;
+
+      ";
+      if($tid == $term->tid){
+
+        $text_selectors = variable_get("taxonomy_classes_colour_selectors", ".feature-colour");
+        $bg_selectors = variable_get("taxonomy_classes_bg_colour_selectors", ".feature-background-colour");
+
+        $css .= "
+        .blog-item.sticky .highlight{
+          border-right: 80px solid transparent;
+          border-top: 80px solid " . $colour . ";
+        }
+        ";
+
+        $css .= $text_selectors . "{
+          color: " . $colour . " !important;
+          border-color: " . $colour . " !important;
+        }
+        " . $bg_selectors . "{
+          background-color: " . $background_colour . " !important;
+        }";
+      }
+    }
+  }
+
+  //$meta = taxonomy_classes_get_term_meta($tid);
+
+  //$colour = !empty($meta['colour']) ? $meta['colour'] : $colours[$count];
+
+  //$css = 'this is fron the function';
+
+  return $css;
+}
+
+
+function taxonomy_classes_hex_to_rgb($hex) {
+
+  $hex = str_replace("#", "", $hex);
+
+  $alpha = variable_get("taxonomy_classes_bg_colour_alpha",0.8);
+  //dsm($hex);
+
+  if(strlen($hex) == 3) {
+    $r = hexdec(substr($hex,0,1).substr($hex,0,1));
+    $g = hexdec(substr($hex,1,1).substr($hex,1,1));
+    $b = hexdec(substr($hex,2,1).substr($hex,2,1));
+  } else {
+    $r = hexdec(substr($hex,0,2));
+    $g = hexdec(substr($hex,2,2));
+    $b = hexdec(substr($hex,4,2));
+  }
+  $rgb = array($r, $g, $b);
+  return "rgba(" . implode(",", $rgb) . "," . $alpha . ")"; // returns the rgb values separated by commas
+  //return $rgb; // returns an array with the rgb values
+}
+
